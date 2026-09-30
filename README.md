@@ -1,32 +1,63 @@
 # NetSentinel: AI SOC Copilot
 
-An LLM + RAG assistant that triages network security logs and proposes response actions for a human to approve.
+An LLM + RAG assistant that triages network security logs and proposes response actions that a human approves.
 
-**Status: early prototype.** The demo works, but retrieval is small and actions are simulated. See [Limitations](#limitations) and [docs/roadmap.md](docs/roadmap.md).
+**Status: working prototype, partly verified.** Core logic and tests run offline. The API layer and live LLM evaluation have not been run end to end yet. See [docs/eval.md](docs/eval.md) and [docs/roadmap.md](docs/roadmap.md) for exactly what is and is not done.
 
-## What it does
-1. Takes network logs (SSH auth, firewall, DNS, flow logs).
-2. Retrieves relevant entries from a small playbook of attack techniques (RAG).
-3. Sends logs + retrieved context to an LLM, which returns severity, attack type, evidence, technique IDs and proposed actions.
-4. Shows proposed actions (block IP, open ticket, isolate host...) that an analyst approves. Approved actions are only written to an on-page log.
+## How it works
+1. **Sanitize and flag** the logs (control characters stripped, delimiter tags removed, injection patterns flagged).
+2. **Retrieve** the most relevant ATT&CK-style techniques from the knowledge base with BM25.
+3. **Triage** with an LLM: logs go in as untrusted data, playbook context as reference.
+4. **Validate** everything the model returns: JSON shape, severity, technique IDs (unknown ones are flagged), and each proposed action.
+5. **Approve** - actions run only after explicit human approval, in dry-run mode unless configured otherwise.
 
-## Run the demo
-`demo/index.html` was built for the Claude artifact runtime, where the AI call is provided by the host page (`claude.use("sample")`). Outside that runtime, retrieval works but the AI step will report that AI is unavailable. The roadmap replaces this with a standalone Python backend.
+Architecture diagram and threat model: [docs/architecture.md](docs/architecture.md).
 
-## Design notes
-- **Retrieval:** keyword matching with idf weighting over 8 hand-written entries.
-- **Untrusted input:** logs are treated as data in the prompt and all model output is rendered as plain text (no HTML injection).
-- **Human in the loop:** nothing runs without approval.
+## Quick start (Windows PowerShell)
+```powershell
+git clone https://github.com/DivyanBabbar/netsentinel-ai-soc-copilot.git
+cd netsentinel-ai-soc-copilot
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Tests and offline evaluation (no API key needed)
+python -m unittest discover -s tests -t .
+python -m eval.run_eval --mode retrieval
+python -m eval.run_eval --mode guard
+
+# Run the service
+$env:ANTHROPIC_API_KEY = "your-key"
+uvicorn netsentinel.api:app --reload
+```
+Linux/macOS: use `source .venv/bin/activate` and `export ANTHROPIC_API_KEY=...`.
+
+Try it:
+```powershell
+$body = @{ logs = "Failed password for root from 203.0.113.45`nFailed password for admin from 203.0.113.45`nAccepted password for deploy from 203.0.113.45" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/triage -ContentType "application/json" -Body $body
+```
+Interactive docs at `http://127.0.0.1:8000/docs`. Configuration variables are listed in `.env.example`.
+
+## Repository layout
+| Path | Purpose |
+|---|---|
+| `netsentinel/retriever.py` | BM25 retrieval (standard library) |
+| `netsentinel/triage.py` | Prompting, model call, output validation |
+| `netsentinel/guard.py` | Log sanitizing and injection flags |
+| `netsentinel/actions.py` | Action allowlist, validation, dry-run execution, Slack notify |
+| `netsentinel/api.py` | FastAPI service |
+| `knowledge_base/` | Curated technique data and attribution |
+| `scripts/ingest_attack.py` | Convert the full MITRE ATT&CK bundle (not yet run on the real file) |
+| `eval/` | Labeled data and evaluation runner |
+| `tests/` | Unit tests |
+| `demo/index.html` | Original single-page demo for the Claude artifact runtime |
 
 ## Limitations
-- Knowledge base is tiny and hand-written, not real MITRE ATT&CK data.
-- Retrieval is keyword-based, not embeddings.
-- Automation is simulated; no real firewall or ticketing integration.
-- No evaluation yet, so no accuracy claims are made.
-- Sample logs are synthetic and use documentation IP ranges.
+- Retrieval is keyword-based over 20 techniques, not embeddings over the full matrix.
+- Real containment (firewall, IAM, EDR) is not connected; only Slack notifications are implemented.
+- Evaluation data is small and synthetic. No accuracy claims are made. LLM results are not yet recorded.
+- Injection heuristics are a tripwire; the real defenses are output validation and human approval.
 
-## Roadmap
-See [docs/roadmap.md](docs/roadmap.md).
-
-## License
-MIT
+## License and attribution
+MIT. MITRE ATT&CK(R) is a registered trademark of The MITRE Corporation; technique text here is a paraphrase.
