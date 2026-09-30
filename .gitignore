@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 node_modules/
 .DS_Store
+eval/results_triage.json
+knowledge_base/attack_full.json
