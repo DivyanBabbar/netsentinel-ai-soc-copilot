@@ -2,7 +2,7 @@
 
 An LLM + RAG assistant that triages network security logs and proposes response actions that a human approves.
 
-**Status: working prototype, partly verified.** Core logic and tests run offline. The API layer and live LLM evaluation have not been run end to end yet. See [docs/eval.md](docs/eval.md) and [docs/roadmap.md](docs/roadmap.md) for exactly what is and is not done.
+**Status: working prototype, partly verified.** Core logic and tests run offline. The API layer has been run locally end to end except for the live model call. Live LLM evaluation has not been run. See [docs/eval.md](docs/eval.md) and [docs/roadmap.md](docs/roadmap.md) for exactly what is and is not done.
 
 ## How it works
 1. **Sanitize and flag** the logs (control characters stripped, delimiter tags removed, injection patterns flagged).
@@ -19,7 +19,7 @@ git clone https://github.com/DivyanBabbar/netsentinel-ai-soc-copilot.git
 cd netsentinel-ai-soc-copilot
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # requirements.txt plus httpx, needed only for the API tests
 
 # Tests and offline evaluation (no API key needed)
 python -m unittest discover -s tests -t .
@@ -48,7 +48,7 @@ Interactive docs at `http://127.0.0.1:8000/docs`. Configuration variables are li
 | `netsentinel/actions.py` | Action allowlist, validation, dry-run execution, Slack notify |
 | `netsentinel/api.py` | FastAPI service |
 | `knowledge_base/` | Curated technique data and attribution |
-| `scripts/ingest_attack.py` | Convert the full MITRE ATT&CK bundle (not yet run on the real file) |
+| `scripts/ingest_attack.py` | Convert the full MITRE ATT&CK bundle (run on the real file; BM25 over the full matrix retrieves worse than the curated set, see docs/eval.md) |
 | `eval/` | Labeled data and evaluation runner |
 | `tests/` | Unit tests |
 | `demo/index.html` | Original single-page demo for the Claude artifact runtime |

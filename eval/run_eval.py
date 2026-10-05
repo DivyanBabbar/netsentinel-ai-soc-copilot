@@ -29,12 +29,12 @@ def same_family(expected_id, found_id):
     return expected_id.split(".")[0] == found_id.split(".")[0]
 
 
-def make_retriever():
-    return BM25Retriever(load_techniques(ROOT / "knowledge_base" / "techniques.json"))
+def make_retriever(kb_path=None):
+    return BM25Retriever(load_techniques(kb_path or ROOT / "knowledge_base" / "techniques.json"))
 
 
-def eval_retrieval():
-    retriever = make_retriever()
+def eval_retrieval(kb_path=None):
+    retriever = make_retriever(kb_path)
     samples = [row for row in read_jsonl(ROOT / "eval" / "dataset.jsonl") if row["expected_technique"]]
     hit_at_1 = hit_at_3 = 0
     for row in samples:
@@ -46,7 +46,7 @@ def eval_retrieval():
         else:
             print(f"  miss: {row['id']} expected {row['expected_technique']} got {found_ids}")
     total = len(samples)
-    print(f"retrieval (n={total}): hit@1 = {hit_at_1}/{total}, hit@3 = {hit_at_3}/{total}")
+    print(f"retrieval (n={total}, {len(retriever.techniques)} techniques): hit@1 = {hit_at_1}/{total}, hit@3 = {hit_at_3}/{total}")
 
 
 def eval_guard():
@@ -111,5 +111,9 @@ def eval_injection():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["retrieval", "guard", "triage", "injection"], required=True)
+    parser.add_argument("--kb", type=Path, default=None, help="knowledge base JSON for retrieval mode (default: curated 20)")
     args = parser.parse_args()
-    {"retrieval": eval_retrieval, "guard": eval_guard, "triage": eval_triage, "injection": eval_injection}[args.mode]()
+    if args.mode == "retrieval":
+        eval_retrieval(args.kb)
+    else:
+        {"guard": eval_guard, "triage": eval_triage, "injection": eval_injection}[args.mode]()

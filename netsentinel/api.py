@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from .actions import execute_action
 from .retriever import BM25Retriever, load_techniques
-from .triage import TriageError, run_triage
+from .triage import LLMUnavailableError, TriageError, run_triage
 
 KNOWLEDGE_BASE_PATH = Path(os.environ.get("KNOWLEDGE_BASE", Path(__file__).resolve().parent.parent / "knowledge_base" / "techniques.json"))
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() != "false"
@@ -42,6 +42,8 @@ def health():
 def triage(request: TriageRequest):
     try:
         return run_triage(request.logs, retriever, use_rag=request.use_rag, protected_targets=PROTECTED_TARGETS)
+    except LLMUnavailableError as error:
+        raise HTTPException(status_code=503, detail=f"model unavailable: {error}")
     except TriageError as error:
         raise HTTPException(status_code=502, detail=f"model output rejected: {error}")
 

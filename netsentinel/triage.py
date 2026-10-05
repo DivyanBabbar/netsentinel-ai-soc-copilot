@@ -28,6 +28,10 @@ class TriageError(Exception):
     """Raised when the model output cannot be parsed or fails validation."""
 
 
+class LLMUnavailableError(Exception):
+    """Raised when the model cannot be called at all (no credentials, auth, rate limit, network)."""
+
+
 def build_user_prompt(clean_logs, techniques):
     if techniques:
         context = "\n\n".join(technique.as_context() for technique in techniques)
@@ -87,13 +91,18 @@ def call_anthropic(system_prompt, user_prompt, model=None, max_tokens=1000):
     """Call the Anthropic API. The SDK is imported here so the rest of the code works without it."""
     import anthropic
 
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
-    response = client.messages.create(
-        model=model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
-        max_tokens=max_tokens,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        raise LLMUnavailableError("no Anthropic credentials: set ANTHROPIC_API_KEY")
+    try:
+        client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
+        response = client.messages.create(
+            model=model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+    except anthropic.APIError as error:
+        raise LLMUnavailableError(f"model call failed: {type(error).__name__}") from error
     return "".join(block.text for block in response.content if block.type == "text")
 
 
