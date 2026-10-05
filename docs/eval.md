@@ -23,6 +23,21 @@ Run from the repository root (see README for setup).
 
 **These numbers are a sanity check, not a benchmark.** The knowledge base, the logs and the labels were all written by the same person, and the set is tiny. Treat them as "the pipeline works", not "the pipeline is accurate".
 
+## Full ATT&CK vs the curated knowledge base (measured October 2026)
+Same 13 attack samples, same BM25 retriever, different knowledge bases. Reproduce:
+```bash
+python scripts/ingest_attack.py enterprise-attack.json knowledge_base/attack_full.json
+python -m eval.run_eval --mode retrieval --kb knowledge_base/attack_full.json
+# and with --skip-pre-attack on the ingest step for the third row
+```
+| Knowledge base | Techniques | hit@1 | hit@3 |
+|---|---|---|---|
+| Curated (default) | 20 | 10 / 13 | 13 / 13 |
+| Full ATT&CK, `ingest_attack.py` output | 697 | 1 / 13 | 2 / 13 |
+| Full ATT&CK with `--skip-pre-attack` | 601 | 2 / 13 | 5 / 13 |
+
+How to read it: plain BM25 over the whole matrix retrieves much worse than the small curated set. The curated set was written next to this dataset, so its 13 / 13 is optimistic, and 13 samples is tiny. What this does support is that "load full ATT&CK" is not a drop-in upgrade, and that embedding-based retrieval (see the roadmap) is worth trying. The curated set stays the default.
+
 LLM triage and LLM injection results: **not run yet.** Add them here after running the two commands above with a real key, and record the model name and date.
 
 ## Making the evaluation credible

@@ -1,9 +1,11 @@
 import json
+import os
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from netsentinel.retriever import BM25Retriever, load_techniques
-from netsentinel.triage import TriageError, extract_json_object, run_triage
+from netsentinel.triage import LLMUnavailableError, TriageError, call_anthropic, extract_json_object, run_triage
 
 KB_PATH = Path(__file__).resolve().parent.parent / "knowledge_base" / "techniques.json"
 BRUTE_FORCE_LOGS = "Failed password for root from 203.0.113.45\nFailed password for admin from 203.0.113.45"
@@ -72,6 +74,17 @@ class TriageTests(unittest.TestCase):
         result = run_triage(logs, self.retriever, llm_call=capturing_llm)
         self.assertTrue(result["injection_flags"])
         self.assertEqual(seen["user"].count("</logs>"), 1)  # only our own closing tag survives
+
+
+class LLMUnavailableTests(unittest.TestCase):
+    def test_missing_credentials_raise_clear_error(self):
+        try:
+            import anthropic  # noqa: F401
+        except ImportError:
+            self.skipTest("anthropic SDK not installed")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(LLMUnavailableError):
+                call_anthropic("system", "user")
 
 
 if __name__ == "__main__":
