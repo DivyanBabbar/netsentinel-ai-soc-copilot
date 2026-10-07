@@ -11,6 +11,7 @@ os.environ.setdefault("PROTECTED_TARGETS", "10.0.0.1")
 try:
     from fastapi.testclient import TestClient
 
+    from netsentinel import api as api_module
     from netsentinel.api import app
     from netsentinel.triage import TriageError
 except ImportError:  # pragma: no cover
@@ -22,8 +23,12 @@ class ApiTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
-    def post_action(self, action_type, target, approved=True):
-        return self.client.post("/actions/execute", json={"approved": approved, "action": {"type": action_type, "target": target, "reason": "test"}})
+    def post_action(self, action_type, target, approved=True, headers=None):
+        return self.client.post(
+            "/actions/execute",
+            json={"approved": approved, "action": {"type": action_type, "target": target, "reason": "test"}},
+            headers=headers,
+        )
 
     def test_health_reports_knowledge_base_and_dry_run(self):
         body = self.client.get("/health").json()
@@ -37,6 +42,21 @@ class ApiTests(unittest.TestCase):
     def test_approved_action_is_dry_run_by_default(self):
         body = self.post_action("block_ip", "203.0.113.9").json()
         self.assertEqual(body["status"], "dry_run")
+
+    def test_live_action_requires_configured_operator_token(self):
+        with mock.patch.object(api_module, "DRY_RUN", False), mock.patch.dict(os.environ, {}, clear=True):
+            response = self.post_action("block_ip", "203.0.113.9")
+        self.assertEqual(response.status_code, 503)
+
+    def test_live_action_checks_operator_token(self):
+        with mock.patch.object(api_module, "DRY_RUN", False), mock.patch.dict(os.environ, {"ACTION_APPROVAL_TOKEN": "operator-secret"}, clear=True):
+            missing = self.post_action("open_ticket", "Investigate alert")
+            wrong = self.post_action("open_ticket", "Investigate alert", headers={"X-Action-Approval-Token": "wrong"})
+            accepted = self.post_action("open_ticket", "Investigate alert", headers={"X-Action-Approval-Token": "operator-secret"})
+        self.assertEqual(missing.status_code, 403)
+        self.assertEqual(wrong.status_code, 403)
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.json()["status"], "not_implemented")
 
     def test_protected_target_is_rejected(self):
         self.assertEqual(self.post_action("block_ip", "10.0.0.1").json()["status"], "rejected")

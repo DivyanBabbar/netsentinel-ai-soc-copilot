@@ -37,6 +37,14 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(len(result["actions"]), 1)
         self.assertTrue(result["retrieved_ids"])
 
+    def test_malformed_list_fields_raise_typed_error(self):
+        for field in ("evidence", "mitre_ids", "actions"):
+            payload = {"severity": "low", "attack_type": "x", "summary": "",
+                       "evidence": [], "mitre_ids": [], "actions": []}
+            payload[field] = 7
+            with self.subTest(field=field), self.assertRaises(TriageError):
+                run_triage(BRUTE_FORCE_LOGS, self.retriever, llm_call=fake_llm(payload))
+
     def test_unsafe_actions_are_rejected(self):
         llm = fake_llm({"severity": "low", "attack_type": "x", "summary": "", "evidence": [], "mitre_ids": [],
                         "actions": [{"type": "block_ip", "target": "127.0.0.1"},
