@@ -20,7 +20,7 @@ flowchart LR
 | Prompt injection in logs | Logs are wrapped in `<logs>` tags, the system prompt says to treat them as data, delimiter tags inside logs are removed, and heuristic patterns raise a flag | `guard.py`, `triage.py` |
 | Model invents technique IDs | IDs not in the knowledge base are moved to `unverified_mitre_ids` | `triage.py` |
 | Model proposes harmful actions | Allowlist of action types, strict target checks (IP, hostname, username), protected-target list, re-validation at execution | `actions.py` |
-| Acting without a person | `/actions/execute` refuses unless `approved` is true; `DRY_RUN` is on unless set to `false` | `api.py` |
+| Unauthorized live action | `/actions/execute` requires `approved=true`; live mode also requires a configured operator token checked with constant-time comparison. `DRY_RUN` stays on unless set to `false` | `api.py` |
 | Oversized or malformed input | Length caps, control characters stripped, model output must parse as JSON with a valid severity | `guard.py`, `triage.py` |
 
 The injection heuristics are a tripwire, not a wall. Determined attackers can phrase instructions the patterns miss, which is why the real protection is output validation plus human approval.
@@ -29,4 +29,5 @@ The injection heuristics are a tripwire, not a wall. Determined attackers can ph
 - Retrieval is BM25 keyword search, not embeddings.
 - The knowledge base is 20 curated techniques, not the full ATT&CK matrix.
 - Only Slack notifications are implemented. Blocking IPs, disabling accounts and isolating hosts are validated and logged but not connected to any real system.
-- The API layer (`api.py`) and live model calls have not been run by the author in a full environment yet.
+- The API layer has been run locally, but live model calls and live response integrations have not been verified.
+- Live execution is limited to Slack notifications; other response actions still have no connected firewall, IAM, or EDR integration.

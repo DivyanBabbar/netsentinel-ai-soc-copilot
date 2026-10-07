@@ -9,7 +9,7 @@ An LLM + RAG assistant that triages network security logs and proposes response 
 2. **Retrieve** the most relevant ATT&CK-style techniques from the knowledge base with BM25.
 3. **Triage** with an LLM: logs go in as untrusted data, playbook context as reference.
 4. **Validate** everything the model returns: JSON shape, severity, technique IDs (unknown ones are flagged), and each proposed action.
-5. **Approve** - actions run only after explicit human approval, in dry-run mode unless configured otherwise.
+5. **Approve** - actions require explicit approval. Live mode additionally requires DRY_RUN=false and a private ACTION_APPROVAL_TOKEN sent in the X-Action-Approval-Token header. Keep that token in a trusted operator tool; never put it in the browser demo.
 
 Architecture diagram and threat model: [docs/architecture.md](docs/architecture.md).
 
@@ -57,7 +57,8 @@ Interactive docs at `http://127.0.0.1:8000/docs`. Configuration variables are li
 - Retrieval is keyword-based over 20 techniques, not embeddings over the full matrix.
 - Real containment (firewall, IAM, EDR) is not connected; only Slack notifications are implemented.
 - Evaluation data is small and synthetic. No accuracy claims are made. LLM results are not yet recorded.
-- Injection heuristics are a tripwire; the real defenses are output validation and human approval.
+- Injection heuristics are a tripwire; the real defenses are output validation and explicit approval.
+- Live actions stay disabled unless a private operator token is configured; keep it out of browser code and client-side logs.
 
 ## License and attribution
 MIT. MITRE ATT&CK(R) is a registered trademark of The MITRE Corporation; technique text here is a paraphrase.

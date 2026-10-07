@@ -17,6 +17,10 @@ class ActionTests(unittest.TestCase):
         self.assertFalse(validate_action({"type": "block_ip", "target": "127.0.0.1"})[0])
         self.assertFalse(validate_action({"type": "block_ip", "target": "1.2.3.4; reboot"})[0])
 
+    def test_rejects_reserved_ip_ranges(self):
+        self.assertFalse(validate_action({"type": "block_ip", "target": "255.255.255.255"})[0])
+        self.assertFalse(validate_action({"type": "block_ip", "target": "240.0.0.1"})[0])
+
     def test_rejects_protected_target(self):
         ok, reason = validate_action({"type": "block_ip", "target": "10.0.0.1"}, protected_targets=("10.0.0.1",))
         self.assertFalse(ok)

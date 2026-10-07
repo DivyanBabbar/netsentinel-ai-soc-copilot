@@ -51,6 +51,15 @@ def extract_json_object(raw_text):
         raise TriageError(f"invalid JSON: {error}") from error
 
 
+def _list_field(parsed, name, limit):
+    value = parsed.get(name, [])
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise TriageError(f"{name} must be a JSON array")
+    return value[:limit]
+
+
 def validate_result(parsed, known_technique_ids, protected_targets=()):
     """Check types and limits, keep only safe actions, and flag technique IDs not in the knowledge base."""
     if not isinstance(parsed, dict):
@@ -59,16 +68,16 @@ def validate_result(parsed, known_technique_ids, protected_targets=()):
     if severity not in SEVERITY_ORDER:
         raise TriageError(f"invalid severity: {severity[:20]}")
 
-    evidence = [str(item)[:300] for item in (parsed.get("evidence") or [])[:6]]
+    evidence = [str(item)[:300] for item in _list_field(parsed, "evidence", 6)]
     verified_ids, unverified_ids = [], []
-    for raw_id in (parsed.get("mitre_ids") or [])[:6]:
+    for raw_id in _list_field(parsed, "mitre_ids", 6):
         technique_id = str(raw_id).strip()
         if not TECHNIQUE_ID_PATTERN.match(technique_id):
             continue
         (verified_ids if technique_id in known_technique_ids else unverified_ids).append(technique_id)
 
     accepted_actions, rejected_actions = [], []
-    for action in (parsed.get("actions") or [])[:4]:
+    for action in _list_field(parsed, "actions", 4):
         is_valid, outcome = validate_action(action, protected_targets)
         if is_valid:
             accepted_actions.append(outcome)

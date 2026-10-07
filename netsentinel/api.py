@@ -1,8 +1,9 @@
 """FastAPI service. Run with: uvicorn netsentinel.api:app --reload"""
 import os
+import secrets
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .actions import execute_action
@@ -49,9 +50,15 @@ def triage(request: TriageRequest):
 
 
 @app.post("/actions/execute")
-def execute(request: ExecuteRequest):
+def execute(request: ExecuteRequest, x_action_approval_token: str | None = Header(None)):
     if not request.approved:
         raise HTTPException(status_code=400, detail="action requires explicit human approval")
+    if not DRY_RUN:
+        expected_token = os.environ.get("ACTION_APPROVAL_TOKEN", "")
+        if not expected_token:
+            raise HTTPException(status_code=503, detail="live actions are disabled until ACTION_APPROVAL_TOKEN is configured")
+        if not x_action_approval_token or not secrets.compare_digest(x_action_approval_token, expected_token):
+            raise HTTPException(status_code=403, detail="valid operator approval token required for live actions")
     return execute_action(
         request.action.model_dump(),
         dry_run=DRY_RUN,

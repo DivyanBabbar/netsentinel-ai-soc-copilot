@@ -17,12 +17,18 @@ FREE_TEXT_PATTERN = re.compile(r"^[^\r\n\x00-\x1f]{1,200}$")
 
 
 def is_safe_ip(text):
-    """True for a normal unicast IP address. Loopback, unspecified, multicast and link-local are refused."""
+    """True for a unicast IP address; special-purpose and non-routable ranges are refused."""
     try:
         address = ipaddress.ip_address(text)
     except ValueError:
         return False
-    return not (address.is_loopback or address.is_unspecified or address.is_multicast or address.is_link_local)
+    return not (
+        address.is_loopback
+        or address.is_unspecified
+        or address.is_multicast
+        or address.is_link_local
+        or address.is_reserved
+    )
 
 
 def validate_action(action, protected_targets=()):
